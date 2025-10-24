@@ -3,6 +3,7 @@ from tkinter import ttk, messagebox, filedialog, simpledialog
 import tempfile
 import os
 import webbrowser
+from pathlib import Path
 import threading
 import json
 import time
@@ -594,7 +595,9 @@ class WebIDE:
         temp = tempfile.NamedTemporaryFile(mode="w", suffix=".html", delete=False, encoding="utf-8")
         temp.write(self.pages[self.current_page])
         temp.close()
-        webbrowser.open('file://' + temp.name)
+
+        file_url = Path(temp.name).resolve().as_uri()
+        webbrowser.open(file_url)
         self.status_label.config(text=f"👁️ Previewing: {self.current_page}")
 
     def export_all_pages(self):
