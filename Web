@@ -698,9 +698,16 @@ class WebIDE:
                 self.root.after(0, lambda: progress.update_status("Connecting to OpenAI..."))
                 
                 client = OpenAI(api_key=api_key)
-                
+
+                # Configure a per-request timeout without relying on unsupported kwargs
+                try:
+                    chat_with_timeout = client.chat.completions.with_options(timeout=45)
+                except AttributeError:
+                    # Older SDKs may not support with_options; fall back gracefully
+                    chat_with_timeout = client.chat.completions
+
                 self.root.after(0, lambda: progress.update_status("Sending request..."))
-                
+
                 # Optimized prompt
                 prompt = f"""Return ONLY the complete HTML code, no explanations or markdown.
 Current HTML:
@@ -714,12 +721,11 @@ Return the full updated HTML code, keeping changes minimal and efficient:"""
                 max_retries = 2
                 for attempt in range(max_retries):
                     try:
-                        response = client.chat.completions.create(
+                        response = chat_with_timeout.create(
                             model="gpt-4o-mini",
                             messages=[{"role": "user", "content": prompt}],
                             temperature=0.5,  # Lower for focused output
-                            max_tokens=1500,  # Reduced for faster response
-                            timeout=60  # Increased timeout
+                            max_tokens=1200  # Reduced for faster response
                         )
                         break  # Success, exit retry loop
                     except Exception as e:
