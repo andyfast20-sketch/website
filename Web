@@ -718,22 +718,38 @@ class WebIDE:
                 
                 self.root.after(0, lambda: progress.update_status("Sending request..."))
                 
-                # Optimized prompt
-                prompt = f"""Return ONLY the complete HTML code, no explanations or markdown.
-Current HTML:
-{html_code}
+                # Optimized prompt with focused instructions
+                system_prompt = (
+                    "You are an expert front-end developer working inside a desktop website builder. "
+                    "Always return a complete, valid HTML5 document that can be rendered without additional context. "
+                    "Preserve the existing structure, assets, scripts, and styles unless the request specifically says to change them. "
+                    "Do not add any explanations, markdown fences, or commentary to your response."
+                )
 
-Request: {user_request}
+                planning_prompt = (
+                    "Focus on the user's requested edits and keep unrelated content unchanged. "
+                    "Confirm that the resulting page will display correctly in a browser, including required <html>, <head>, and <body> elements."
+                )
 
-Return the full updated HTML code, keeping changes minimal and efficient:"""
-                
+                user_prompt = (
+                    f"Requested changes:\n{user_request}\n\n"
+                    f"Current page HTML:\n{html_code}\n\n"
+                    "Apply the requested updates and return the full HTML document."
+                )
+
+                messages = [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": planning_prompt},
+                    {"role": "user", "content": user_prompt},
+                ]
+
                 # Retry logic
                 max_retries = 2
                 for attempt in range(max_retries):
                     try:
                         response = client.chat.completions.create(
                             model="gpt-4o-mini",
-                            messages=[{"role": "user", "content": prompt}],
+                            messages=messages,
                             temperature=0.5,  # Lower for focused output
                             max_tokens=1500,  # Reduced for faster response
                             timeout=60  # Increased timeout
@@ -753,15 +769,28 @@ Return the full updated HTML code, keeping changes minimal and efficient:"""
                 processing_time = time.time() - start_time
                 print(f"AI request completed in {processing_time:.2f} seconds")
                 
-                new_html = response.choices[0].message.content.strip()
-                
+                new_html = response.choices[0].message.content.strip() if response.choices else ""
+
                 # Simplified response cleanup
                 if new_html.startswith("```html") or new_html.startswith("```"):
                     new_html = new_html[new_html.index('\n') + 1:] if '\n' in new_html else new_html[3:]
                 if new_html.endswith("```"):
                     new_html = new_html[:-3]
                 new_html = new_html.strip()
-                
+
+                if not new_html:
+                    result["error"] = (
+                        "The AI returned an empty response. Please try your request again with more detail."
+                    )
+                    return
+
+                normalized_html = new_html.lower()
+                if "<html" not in normalized_html or "<body" not in normalized_html:
+                    result["error"] = (
+                        "The AI response did not contain a complete HTML document. Try refining your request."
+                    )
+                    return
+
                 result["html"] = new_html
                 
             except Exception as e:
