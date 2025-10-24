@@ -679,9 +679,23 @@ class WebIDE:
 
         # Check input size
         html_code = self.code_text.get("1.0", tk.END)
-        if len(html_code) > 10000:  # Arbitrary limit, adjust as needed
-            messagebox.showwarning("Warning", "HTML content is too large. Try simplifying the page to avoid timeouts.")
+        html_length = len(html_code)
+        # Allow larger files but warn if size may cause timeouts
+        if html_length > 60000:
+            messagebox.showwarning(
+                "Warning",
+                "HTML content is extremely large and may timeout."
+                " Try simplifying the page before asking the AI to edit."
+            )
             return
+        if html_length > 20000:
+            proceed = messagebox.askyesno(
+                "Large HTML Detected",
+                "The HTML content is quite large and may take longer to process.\n"
+                "Do you still want to continue?"
+            )
+            if not proceed:
+                return
 
         # Create progress dialog
         progress = ProgressDialog(self.root, "AI Processing")
